@@ -1,0 +1,89 @@
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Web Push Notification Demo</title>
+  </head>
+  <body>
+    <span id="welcome-msg"
+      >If you see this AFTER you accepted Permissions you should refresh the
+      page.</span
+    >
+    <button id="notify-btn">Notify</button>
+    <script>
+      const notifyBtn = document.getElementById("notify-btn");
+      notifyBtn.addEventListener("click", () => {
+        fetch("/notify").then((res) => {
+          console.log(res);
+        });
+      });
+
+      const vapidPublicKey = urlBase64ToUint8Array(
+        "BIhkiNM1U1xyGKU8JRRO8okL_4zemo2B_lL87W4eS1bfytF0YfOAI61dIyE6DkMX-jpAtK5m0_oOVMVn4A4dYqg"
+      );
+
+      // Let's check if the browser supports notifications
+      if (!("Notification" in window)) {
+        alert("This browser does not support push notification.");
+        document.getElementById("welcome-msg").innerHTML =
+          "This browser does not support push notification.";
+      } else {
+        Notification.requestPermission(function (status) {
+          console.log("Notification Permission status:", status);
+        });
+
+        if (Notification.permission === "denied") {
+          document.getElementById("welcome-msg").innerHTML =
+            "You've denied notification on a notification Demo!";
+        }
+
+        if (navigator.serviceWorker) {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then(function (registration) {
+              const subscribeOptions = {
+                userVisibleOnly: true,
+                applicationServerKey: vapidPublicKey,
+              };
+
+              return registration.pushManager.subscribe(subscribeOptions);
+            })
+            .then(function (pushSubscription) {
+              PostSubscriptionDetails(pushSubscription);
+            });
+        }
+      }
+
+      function PostSubscriptionDetails(Subscription) {
+        let sub = JSON.parse(JSON.stringify(Subscription));
+
+        let token = sub.keys.p256dh;
+        let auth = sub.keys.auth;
+        let fields = { endpoint: sub.endpoint, token: token, auth: auth };
+
+        fetch("/newbrowser", {
+          method: "POST",
+          headers: new Headers({ "Content-Type": "application/json" }),
+          body: JSON.stringify(fields),
+        }).then(function (data) {
+          console.log("returned from server:");
+          console.log(data);
+          document.getElementById("welcome-msg").innerHTML =
+            "Ready for Notifications!";
+        });
+      }
+
+      function urlBase64ToUint8Array(base64String) {
+        const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+        const base64 = (base64String + padding)
+          .replace(/\-/g, "+")
+          .replace(/_/g, "/");
+        const rawData = window.atob(base64);
+        return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+      }
+    </script>
+  </body>
+</html>
